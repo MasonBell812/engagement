@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>RSA Activity</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/forge/1.3.1/forge.min.js"></script>
+  <style>
+    body {
+      font-family: Arial;
+      max-width: 700px;
+      margin: 40px auto;
+    }
+    h2 {
+      margin-top: 32px;
+    }
+    label {
+      display: block;
+      margin-top: 16px;
+    }
+    input[type="number"] {
+      width: 80px;
+      padding: 6px;
+      font-size: 15px;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 6px;
+      font-size: 15px;
+      box-sizing: border-box;
+      margin-top: 6px;
+    }
+    button {
+      margin-top: 10px;
+      padding: 7px 18px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    .prime-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .prime-result {
+      flex: 1;
+      padding: 6px;
+      font-size: 15px;
+      background: #f3f3f3;
+      border: 1px solid #ccc;
+      min-width: 120px;
+      word-break: break-all;
+    }
+    .hint {
+      font-size: 13px;
+      color: #666;
+      margin-top: 6px;
+    }
+    .secret-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .secret-row label {
+      margin: 0;
+      white-space: nowrap;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>RSA Activity</h1>
+  <p><a href="index.html">← Back to Cryptography Demo</a></p>
+
+  <h2>Step 1. Generate your two secret prime numbers.</h2>
+
+  <label>Generate random prime with <select id="digitCount" style="width:80px;padding:6px;font-size:15px;">
+  <option>1</option>
+  <option>2</option>
+  <option>3</option>
+  <option>4</option>
+  <option>5</option>
+  <option>6</option>
+  <option>7</option>
+  <option>8</option>
+  <option>9</option>
+  <option selected>10</option>
+</select> decimal digits</label>
+
+
+  <div class="prime-row">
+    <button onclick="generatePrime()">Generate</button>
+    <span class="prime-result" id="primeResult">—</span>
+  </div>
+
+  <p style="margin-top:24px;">Input your two secret primes below (using the prime number tool above).</p>
+
+  <div class="secret-row">
+    <label>secret prime: <em>p</em> =</label>
+    <input type="text" id="primeP" placeholder="enter p">
+  </div>
+
+  <div class="secret-row">
+    <label>secret prime: <em>q</em> =</label>
+    <input type="text" id="primeQ" placeholder="enter q">
+  </div>
+
+  <script>
+    const SMALL_PRIMES = {
+      1: [2, 3, 5, 7],
+      2: [11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97]
+    };
+
+    function generatePrime() {
+      const N = parseInt(document.getElementById("digitCount").value);
+      if (isNaN(N) || N < 1) return;
+
+      document.getElementById("primeResult").textContent = "Generating…";
+
+      // For small N, pick randomly from a hardcoded list
+      if (SMALL_PRIMES[N]) {
+        const list = SMALL_PRIMES[N];
+        const pick = list[Math.floor(Math.random() * list.length)];
+        document.getElementById("primeResult").textContent = pick.toString();
+        return;
+      }
+
+      const bits = Math.ceil(N * Math.log2(10));
+
+      function tryGenerate() {
+        forge.prime.generateProbablePrime(bits, function(err, num) {
+          if (err) {
+            document.getElementById("primeResult").textContent = "Error generating prime.";
+            return;
+          }
+          const dec = num.toString();
+          if (dec.length !== N) {
+            setTimeout(tryGenerate, 0);
+          } else {
+            document.getElementById("primeResult").textContent = dec;
+          }
+        });
+      }
+
+      tryGenerate();
+    }
+  </script>
+</body>
+</html>
