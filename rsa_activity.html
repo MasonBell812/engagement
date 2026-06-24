@@ -42,6 +42,9 @@
       margin-top: 10px;
       flex-wrap: wrap;
     }
+    .prime-row button {
+      margin-top: 0;
+    }
     .prime-result {
       flex: 1;
       padding: 6px;
@@ -89,28 +92,91 @@
 </select> decimal digits</label>
 
 
-  <div class="prime-row">
+  <div class="prime-row" style="align-items:center;">
     <button onclick="generatePrime()">Generate</button>
     <span class="prime-result" id="primeResult">—</span>
+    <button onclick="copyPrime()" id="copyBtn" style="margin-top:0;">Copy</button>
   </div>
 
   <p style="margin-top:24px;">Input your two secret primes below (using the prime number tool above).</p>
 
   <div class="secret-row">
     <label>secret prime: <em>p</em> =</label>
-    <input type="text" id="primeP" placeholder="enter p">
+    <input type="text" id="primeP" placeholder="enter p" oninput="updateStep2()">
   </div>
 
   <div class="secret-row">
     <label>secret prime: <em>q</em> =</label>
-    <input type="text" id="primeQ" placeholder="enter q">
+    <input type="text" id="primeQ" placeholder="enter q" oninput="updateStep2()">
   </div>
+
+  <h2>Step 2. The public key.</h2>
+
+  <div class="secret-row">
+    <label>public modulus: <em>n</em> = <em>p</em> × <em>q</em> =</label>
+    <span class="prime-result" id="nResult">—</span>
+  </div>
+
+  <div class="secret-row" style="margin-top:16px;">
+    <label>public exponent: <em>e</em> =</label>
+    <input type="text" id="eInput" placeholder="enter e" oninput="updateStep2()" style="width:200px;">
+  </div>
+  <div class="hint" id="gcdHint"></div>
 
   <script>
     const SMALL_PRIMES = {
       1: [2, 3, 5, 7],
       2: [11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97]
     };
+
+    function copyPrime() {
+      const val = document.getElementById("primeResult").textContent;
+      if (val === "—" || val === "Generating…") return;
+      navigator.clipboard.writeText(val).then(() => {
+        const btn = document.getElementById("copyBtn");
+        btn.textContent = "Copied!";
+        setTimeout(() => btn.textContent = "Copy", 1500);
+      });
+    }
+
+    function gcd(a, b) {
+      while (b) { [a, b] = [b, a % b]; }
+      return a;
+    }
+
+    function updateStep2() {
+      const pVal = document.getElementById("primeP").value.trim();
+      const qVal = document.getElementById("primeQ").value.trim();
+      const eVal = document.getElementById("eInput").value.trim();
+      const nEl  = document.getElementById("nResult");
+      const hint = document.getElementById("gcdHint");
+
+      // Compute n = p * q
+      if (pVal && qVal && /^\d+$/.test(pVal) && /^\d+$/.test(qVal)) {
+        const p = BigInt(pVal);
+        const q = BigInt(qVal);
+        nEl.textContent = (p * q).toString();
+
+        // Compute GCD(e, phi(n)) = GCD(e, (p-1)(q-1))
+        if (eVal && /^\d+$/.test(eVal)) {
+          const e = BigInt(eVal);
+          const phi = (p - 1n) * (q - 1n);
+          const g = gcd(e, phi);
+          if (g === 1n) {
+            hint.textContent = "✓ e and φ(n) are coprime.";
+            hint.style.color = "#27ae60";
+          } else {
+            hint.textContent = `✗ e and φ(n) are not coprime. Choose a different e.`;
+            hint.style.color = "#c0392b";
+          }
+        } else {
+          hint.textContent = "";
+        }
+      } else {
+        nEl.textContent = "—";
+        hint.textContent = "";
+      }
+    }
 
     function generatePrime() {
       const N = parseInt(document.getElementById("digitCount").value);
