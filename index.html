@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>PQC at QUT</title>
+<title>Cryptography Demo</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsencrypt/bin/jsencrypt.min.js"></script>
 <style>
@@ -74,7 +74,7 @@ label, h3 {
 </style>
 </head>
 <body>
-<h1 id="pageTitle">Encryption Demo</h1>
+<h1 id="pageTitle">Cryptography Demo</h1>
 
 <div class="mode-toggle">
   <button id="btnEncrypt" class="active" onclick="setMode('encrypt')">Encrypt</button>
@@ -89,6 +89,7 @@ label, h3 {
   <option value="xor">XOR</option>
   <option value="aes">AES</option>
   <option value="rsa">RSA</option>
+  <option value="elgamal">ElGamal</option>
 </select>
 
 <label id="inputLabel">Plaintext</label>
@@ -111,11 +112,104 @@ label, h3 {
   <textarea id="privatekey" readonly style="display:none;"></textarea>
 </div>
 
+<div id="elgamalSection" style="display:none;">
+  <h3>Public Key (p, g, y)</h3>
+  <textarea id="elgamalPublicKey" readonly></textarea>
+  <h3 style="display:inline-block;margin-right:10px;">Private Key (x)</h3>
+  <button id="toggleElgamalPrivateKey" onclick="toggleElgamalPrivateKey()" style="font-size:13px;padding:3px 10px;cursor:pointer;">Show</button>
+  <div id="elgamalPrivatekeyPlaceholder" style="height:90px;margin-top:10px;background:#e0e0e0;border:1px solid #bbb;border-radius:3px;display:flex;align-items:center;justify-content:center;color:#999;font-size:14px;">🔒 Hidden</div>
+  <textarea id="elgamalPrivateKey" readonly style="display:none;"></textarea>
+</div>
+
 <script>
 let mode = "encrypt";
 
 let rsa = new JSEncrypt({ default_key_size: 1024 });
 rsa.getKey();
+
+// ── ElGamal helpers (must be defined before EG init) ──
+
+function modPow(base, exp, mod) {
+  let result = 1n;
+  base = base % mod;
+  while (exp > 0n) {
+    if (exp % 2n === 1n) result = result * base % mod;
+    exp = exp >> 1n;
+    base = base * base % mod;
+  }
+  return result;
+}
+
+function modInverse(a, m) {
+  let [old_r, r] = [a, m];
+  let [old_s, s] = [1n, 0n];
+  while (r !== 0n) {
+    const q = old_r / r;
+    [old_r, r] = [r, old_r - q * r];
+    [old_s, s] = [s, old_s - q * s];
+  }
+  return ((old_s % m) + m) % m;
+}
+
+// ── ElGamal setup (BigInt) ──
+const EG = (() => {
+  // Safe prime (RFC 3526 / IKE group 1, 768-bit) — well-known and verified
+  const p = BigInt(
+    "0xFFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1" +
+    "29024E088A67CC74020BBEA63B139B22514A08798E3404DD" +
+    "EF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245" +
+    "E485B576625E7EC6F44C42E9A63A3620FFFFFFFFFFFFFFFF"
+  );
+  const g = 2n;
+  function randBig(bits) {
+    const bytes = new Uint8Array(bits / 8);
+    crypto.getRandomValues(bytes);
+    let n = 0n;
+    for (const b of bytes) n = (n << 8n) | BigInt(b);
+    return n;
+  }
+  const x = (randBig(256) % (p - 3n)) + 2n;
+  const y = modPow(g, x, p);
+  return { p, g, x, y };
+})();
+
+function elgamalEncrypt(text) {
+  const { p, g, y } = EG;
+  const pairs = [];
+  for (const ch of text) {
+    const m = BigInt(ch.codePointAt(0));
+    // random k in [2, p-2]
+    const kBytes = new Uint8Array(32);
+    crypto.getRandomValues(kBytes);
+    let k = 0n;
+    for (const b of kBytes) k = (k << 8n) | BigInt(b);
+    k = (k % (p - 3n)) + 2n;
+    const c1 = modPow(g, k, p);
+    const c2 = (m * modPow(y, k, p)) % p;
+    pairs.push(`${c1}:${c2}`);
+  }
+  return pairs.join("|");
+}
+
+function elgamalDecrypt(ciphertext) {
+  const { p, x } = EG;
+  try {
+    const pairs = ciphertext.trim().split("|");
+    let result = "";
+    for (const pair of pairs) {
+      const [c1s, c2s] = pair.split(":");
+      const c1 = BigInt(c1s.trim());
+      const c2 = BigInt(c2s.trim());
+      const s = modPow(c1, x, p);
+      const sInv = modInverse(s, p);
+      const m = (c2 * sInv) % p;
+      result += String.fromCodePoint(Number(m));
+    }
+    return result;
+  } catch (e) {
+    return "ElGamal decryption failed — ensure ciphertext is from this session.";
+  }
+}
 
 // Per-algorithm hints and validators
 const ALGO_INFO = {
@@ -162,6 +256,12 @@ const ALGO_INFO = {
       return null;
     },
   },
+  elgamal: {
+    messageHint: "Short text only — ElGamal encrypts character by character using large numbers.",
+    keyHint: "No key needed — ElGamal uses the generated key pair shown below.",
+    validateKey: () => null,
+    validateMessage: () => null,
+  },
 };
 
 function setMode(newMode) {
@@ -169,7 +269,7 @@ function setMode(newMode) {
   document.getElementById("btnEncrypt").classList.toggle("active", mode === "encrypt");
   document.getElementById("btnDecrypt").classList.toggle("active", mode === "decrypt");
 
-  document.getElementById("pageTitle").textContent = mode === "encrypt" ? "Encryption Demo" : "Decryption Demo";
+  document.getElementById("pageTitle").textContent = "Cryptography Demo";
   document.getElementById("inputLabel").textContent = mode === "encrypt" ? "Plaintext" : "Ciphertext";
   document.getElementById("outputLabel").textContent = mode === "encrypt" ? "Ciphertext" : "Plaintext";
 
@@ -191,6 +291,17 @@ function togglePrivateKey() {
   placeholder.style.display = isHidden ? "none" : "flex";
   btn.textContent = isHidden ? "Hide" : "Show";
 }
+
+function toggleElgamalPrivateKey() {
+  const field = document.getElementById("elgamalPrivateKey");
+  const placeholder = document.getElementById("elgamalPrivatekeyPlaceholder");
+  const btn = document.getElementById("toggleElgamalPrivateKey");
+  const isHidden = field.style.display === "none";
+  field.style.display = isHidden ? "block" : "none";
+  placeholder.style.display = isHidden ? "none" : "flex";
+  btn.textContent = isHidden ? "Hide" : "Show";
+}
+
 
 function updateHints() {
   const algo = document.getElementById("algorithm").value;
@@ -226,12 +337,20 @@ function update() {
   document.getElementById("privatekey").value = rsa.getPrivateKey();
   rsaSection.style.display = (algo === "rsa") ? "block" : "none";
 
+  const elgamalSection = document.getElementById("elgamalSection");
+  elgamalSection.style.display = (algo === "elgamal") ? "block" : "none";
+  if (algo === "elgamal") {
+    const { p, g, y, x } = EG;
+    document.getElementById("elgamalPublicKey").value = `p = ${p}\ng = ${g}\ny = ${y}`;
+    document.getElementById("elgamalPrivateKey").value = `x = ${x}`;
+  }
+
   updateHints();
 
   const { keyValidation, msgValidation } = getValidationErrors();
 
   // Show prompt if fields are empty
-  const keyNeeded = algo !== "rsa";
+  const keyNeeded = algo !== "rsa" && algo !== "elgamal";
   const missing = [];
   if (text === "") missing.push(mode === "encrypt" ? "a plaintext message" : "a ciphertext");
   if (keyNeeded && key === "") missing.push("a key/shift");
@@ -256,11 +375,13 @@ function update() {
     if (algo === "vigenere") result = vigenere(text, key);
     if (algo === "xor")      result = xorCipher(text, key);
     if (algo === "aes")      result = CryptoJS.AES.encrypt(text, key).toString();
+    if (algo === "elgamal")  result = elgamalEncrypt(text);
   } else {
     if (algo === "rsa")      result = rsa.decrypt(text) || "RSA decryption failed — ensure you are using ciphertext from this session.";
     if (algo === "caesar")   result = caesarDecrypt(text, parseInt(key));
     if (algo === "vigenere") result = vigenereDecrypt(text, key);
     if (algo === "xor")      result = xorCipher(text, key);
+    if (algo === "elgamal")  result = elgamalDecrypt(text);
     if (algo === "aes") {
       try {
         const bytes = CryptoJS.AES.decrypt(text, key);
@@ -343,7 +464,8 @@ function vigenereDecrypt(text, key) {
 /* ── Event listeners ── */
 document.getElementById("inputText").addEventListener("input", update);
 document.getElementById("key").addEventListener("input", () => {
-  if (document.getElementById("algorithm").value !== "rsa") update();
+  const algo = document.getElementById("algorithm").value;
+  if (algo !== "rsa" && algo !== "elgamal") update();
 });
 document.getElementById("algorithm").addEventListener("change", update);
 
