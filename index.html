@@ -6,10 +6,41 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsencrypt/bin/jsencrypt.min.js"></script>
 <style>
+/* QUT Brand */
 body {
-  font-family: Arial;
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;
+  background: #f0f4f8;
+}
+.qut-header {
+  background: #00407A;
+  padding: 14px 32px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.qut-header-title {
+  color: #fff;
+  font-size: 18px;
+  font-weight: bold;
+  border-left: 2px solid rgba(255,255,255,0.4);
+  padding-left: 16px;
+}
+.qut-footer {
+  background: #00407A;
+  height: 6px;
+  margin-top: 40px;
+}
+.page-content {
   max-width: 700px;
-  margin: 40px auto;
+  margin: 0 auto;
+  padding: 32px 32px 60px;
+  background: #fff;
+  border-left: 5px solid #00407A;
+  border-right: 5px solid #00407A;
+  min-height: calc(100vh - 74px - 6px);
+  box-sizing: border-box;
 }
 textarea, input, select {
   width: 100%;
@@ -74,7 +105,18 @@ label, h3 {
 </style>
 </head>
 <body>
-<h1 id="pageTitle">Cryptography Demo</h1>
+
+<header class="qut-header">
+  <a href="https://www.qut.edu.au" target="_blank">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 50" height="44">
+      <text x="4" y="40" font-family="Arial Black, Arial" font-weight="900" font-size="46" fill="#ffffff" letter-spacing="-2">QUT</text>
+    </svg>
+  </a>
+  <span class="qut-header-title">Cryptography Demo</span>
+</header>
+
+<div class="page-content">
+<h1>Cryptography Demo</h1>
 <nav><a href="rsa_activity.html">RSA Activity</a></nav>
 
 <div class="mode-toggle">
@@ -269,8 +311,6 @@ function setMode(newMode) {
   mode = newMode;
   document.getElementById("btnEncrypt").classList.toggle("active", mode === "encrypt");
   document.getElementById("btnDecrypt").classList.toggle("active", mode === "decrypt");
-
-  document.getElementById("pageTitle").textContent = "Cryptography Demo";
   document.getElementById("inputLabel").textContent = mode === "encrypt" ? "Plaintext" : "Ciphertext";
   document.getElementById("outputLabel").textContent = mode === "encrypt" ? "Ciphertext" : "Plaintext";
 
@@ -473,5 +513,7 @@ document.getElementById("algorithm").addEventListener("change", update);
 // Show hints and initial prompt on load
 update();
 </script>
+</div>
+<div class="qut-footer"></div>
 </body>
 </html>
